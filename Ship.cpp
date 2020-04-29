@@ -1,102 +1,93 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "Ship.h"
 #include "Splash.h"
+#include "TrueSkyWaterBuoyancyComponent.h"
+#include "TrueSkyWaterProbeComponent.h"
+#include "Engine/World.h"
+
+
+
 
 // Sets default values
 AShip::AShip()
 {
-	// Set this pawn to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 }
 
-
-
-
-// Distribute vectors evengly in a straight line across X axis
-TArray<FVector> AShip::rangeOfVectors(FVector start, FVector end, int32 sizeOf)
+void AShip::setProbesToPhysics()
 {
-	TArray<FVector> rangeOfVectors;
+	UPROPERTY()
+		TArray<UTrueSkyWaterProbeComponent*> waterProbes;
 
-	float step = FVector::Dist(start, end) / sizeOf - 1;
-	for (int32 i = 0; i < sizeOf; i++)
+	GetComponents<UTrueSkyWaterProbeComponent>(waterProbes);
+
+	if (waterComponents[0] && waterProbes.IsValidIndex(0))
 	{
-		rangeOfVectors.Add(FVector(start.X + (i * step), start.Y, start.Z));
+		for (int i = 0; i < waterProbes.Num(); i++)
+		{
+			USceneComponent* waterProbesAttachedTo = Cast<USceneComponent>(waterProbes[i]->GetAttachParent());
+			if (waterProbesAttachedTo == waterComponents[0] && waterProbes[i]->ProbeType == EProbeType::None)
+			{
+				waterProbes[i]->ProbeType = EProbeType::Physics;
+			}
+		}
 	}
-	return rangeOfVectors;
+	// GetWorld()->GetTimerManager().ClearTimer(timerForProbes);
 }
-
-// Where to start traces from
-void AShip::calculateLineTraceLocations()
-{
-	FVector forward = (AActor::GetActorForwardVector() * 3000.f) + GetActorLocation();
-	FVector back = (-AActor::GetActorForwardVector() * 3000.f) + GetActorLocation();
-	FVector right = (AActor::GetActorRightVector() * 800.f) + GetActorLocation();
-	FVector left = ((-AActor::GetActorRightVector()) * 800.f) + GetActorLocation();
-
-	FVector topRight = FVector(right.X + 3000.f, right.Y, right.Z - 200.f);
-	FVector topLeft = FVector(left.X + 3000.f, left.Y, left.Z - 200.f);
-	FVector backRight = FVector(right.X - 3000.f, right.Y, right.Z - 200.f);
-	FVector backLeft = FVector(left.X - 3000.f, left.Y, left.Z - 200.f);
-
-	rightTracesStart.Append(rangeOfVectors(backRight, topRight, 16));
-	leftTracesStart.Append(rangeOfVectors(backLeft, topLeft, 16));
-}
-
-/*// Create a vector of evenly spaced numbers.
-vector<double> range(double min, double max, size_t N)
-{
-	vector<double> range;
-	double delta = (max - min) / double(N - 1);
-	for (int i = 0; i < N; i++) {
-		range.push_back(min + i * delta);
-	}
-	return range;
-} */
 
 // Called when the game starts or when spawned
 void AShip::BeginPlay()
 {
 	Super::BeginPlay();
-	calculateLineTraceLocations();
+
+	GetComponents(waterComponents);
+	// GetWorld()->GetTimerManager().SetTimer(timerForProbes, this, &AShip::setProbesToPhysics, 0.1f, false);
 
 	FHitResult outHit;
 	FCollisionQueryParams collisionParams;
-	this->GetComponents(waterComponents);
 
-	// Calculate positions of splash components and attach them to water byouancy component
-	// Right side
-	int hitFalse = 0;
-	for (int32 i = 0; i < rightTracesStart.Num(); i++)
-	{
-		if (GetWorld()->LineTraceSingleByChannel(outHit, rightTracesStart[i], rightTracesStart[i] + FVector(0.f, -790.f, 0.f), ECC_Visibility, collisionParams))
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Red, FString::Printf(TEXT("You hit %s"), *outHit.Location.ToString()));
-			splashComponents.Add(splash);
-			splashComponents[i - hitFalse] = NewObject<USplash>(this);
-			splashComponents[i - hitFalse]->RegisterComponent();
-			splashComponents[i - hitFalse]->SetWorldLocationAndRotation(outHit.Location, FRotator::ZeroRotator);
-			splashComponents[i - hitFalse]->AttachToComponent(waterComponents[0], FAttachmentTransformRules::KeepWorldTransform, NAME_None);
-		}
-		else hitFalse++;
-	}
-	// Left side
-	hitFalse = 0;
-	for (int32 i = 0; i < leftTracesStart.Num(); i++)
-	{
-		if (GetWorld()->LineTraceSingleByChannel(outHit, leftTracesStart[i], leftTracesStart[i] + FVector(0.f, 790.f, 0.f), ECC_Visibility, collisionParams))
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Blue, FString::Printf(TEXT("You hit %s"), *outHit.Location.ToString()));
-			splashComponents.Add(splash);
-			splashComponents[i - hitFalse] = NewObject<USplash>(this);
-			splashComponents[i - hitFalse]->RegisterComponent();
+	FVector center = GetActorLocation();
+	center.Z -= 200.f;
 
-			// Rotating component before attaching so that we won't need to adjust emitter rotation when spawned
-			splashComponents[i - hitFalse]->SetWorldLocationAndRotation(outHit.Location, FRotator(0.f, 180.f, 0.f));
-			splashComponents[i - hitFalse]->AttachToComponent(waterComponents[0], FAttachmentTransformRules::KeepWorldTransform, NAME_None);
+	FVector prevSplashLocation(0.f, 0.f, 0.f);
+
+	for (double a = 0.0; a < 2 * PI; a += 2 * PI / 128) // devide circle on 128 parts
+	{
+		FVector end_vector;
+		end_vector.X = 4000.f * cos(a);
+		end_vector.Y = 4000.f * sin(a);
+		end_vector.Z = center.Z;
+
+		if (GetWorld()->LineTraceSingleByChannel(outHit, end_vector, center, ECC_Visibility, collisionParams))
+		{
+			if (FVector::Dist(prevSplashLocation, outHit.Location) > 300.f)
+			{
+				USplash* currentSplash = NewObject<USplash>(this);
+
+				// Make sure the probes won't affect the ship physics and won't create waves
+				currentSplash->ProbeType = EProbeType::DepthTest;
+
+				currentSplash->RegisterComponent();
+				currentSplash->SetWorldLocationAndRotation(outHit.Location, FRotator::ZeroRotator);
+
+				// saving vector of a normal relative to respective USplash instance
+				currentSplash->splashNormalLocal = outHit.Normal * 100.f - currentSplash->GetComponentLocation().Normalize();
+				currentSplash->AttachToComponent(waterComponents[0], FAttachmentTransformRules::KeepWorldTransform, NAME_None);
+				prevSplashLocation = outHit.Location;
+			}
+			/*	if (a <= PI)
+				{
+					GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Red, FString::Printf(TEXT("You hit %s"), *outHit.Location.ToString()));
+					new_splash->setRightSided(true);
+				}
+				else
+				{
+					GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Blue, FString::Printf(TEXT("You hit %s"), *outHit.Location.ToString()));
+					new_splash->setRightSided(false);
+				}
+				splashComponents.Add(new_splash); */
 		}
-		else hitFalse++;
 	}
 }
 
@@ -104,6 +95,11 @@ void AShip::BeginPlay()
 void AShip::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+
+
+
+
 }
 
 // Called to bind functionality to input

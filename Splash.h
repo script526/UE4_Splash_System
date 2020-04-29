@@ -2,10 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "TrueSkyWaterProbeComponent.h"
-#include "Components/ActorComponent.h"
-#include "Engine.h"
-#include "UObject/UObjectGlobals.h"
 #include "Splash.generated.h"
+
 
 UCLASS(Blueprintable, ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class ALMAZ_API USplash : public UTrueSkyWaterProbeComponent
@@ -14,16 +12,20 @@ class ALMAZ_API USplash : public UTrueSkyWaterProbeComponent
 
 		~USplash();
 
-	class AShip* ship;
-	UParticleSystem* splashFX;
+	class UParticleSystem* splashFX;
+	// TArray<UParticleEmitter*> emitters;
 
-	FTimerHandle timerHandle;
+	struct FTimerHandle timerHandle;
 	FColor DebugSphereColor;
 	FVector scale;
+	FVector splashNormalLocal; // vector of a normal in local space of 'this' component
+
+	bool is_right_side = false;
 
 	float GetComponentDepth();
-	float compDepth;
 	bool bReadyForSplashes;
+
+	// void setRightSided(const bool &side);
 
 	void resetSplash();
 	void spawnSplashes();

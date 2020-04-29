@@ -1,10 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
-
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
-#include "TrueSkyWaterBuoyancyComponent.h"
 #include "Ship.generated.h"
 
 UCLASS()
@@ -16,31 +14,21 @@ public:
 	// Sets default values for this pawn's properties
 	AShip();
 
-		AShip* Ship;
-		class USplash* splash;
+	// struct FTimerHandle timerForProbes;
 
-		UPROPERTY()
+	UPROPERTY()
 		TArray<class USplash*> splashComponents;
 
-		UPROPERTY()
-		TArray<UTrueSkyWaterBuoyancyComponent*> waterComponents;
+	UPROPERTY()
+		TArray<class UTrueSkyWaterBuoyancyComponent*> waterComponents;
 
-		UPROPERTY()
-		TArray<FVector> rightTracesStart;
-
-		UPROPERTY()
-		TArray<FVector> leftTracesStart;
-
-		UFUNCTION()
-		TArray<FVector> rangeOfVectors(FVector start, FVector end, int32 counter);
-
-		void calculateLineTraceLocations();
+	void setProbesToPhysics();
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-public:	
+public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
